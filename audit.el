@@ -62,11 +62,16 @@
       (add-hook 'after-load-functions 'audit-refresh)
     (remove-hook 'after-load-functions 'audit-refresh)))
 
+(defun audit-cache ()
+  "Get the audit-cache, from disk if it's empty."
+  (unless audit-cache (audit-load))
+  audit-cache)
+
 (defun audit-save ()
   "Save the audit database."
   (interactive)
   (with-temp-file audit-db-path
-    (insert (format "%S" audit-cache))))
+    (insert (format "%S" (audit-cache)))))
 
 (defun audit-load ()
   "Load the audit database."
@@ -147,7 +152,7 @@
                                 (buffer-string))
                               'face
                               'audit-heading-face))))))
-        audit-cache))
+        (audit-cache)))
 
 (defun audit-git-commit ()
   "Get the current commit."
@@ -201,7 +206,7 @@
                                   line-start
                                   sample
                                   comment))))))
-          audit-cache)))
+          (audit-cache))))
 
 (define-derived-mode audit-status-mode
   help-mode "Audit-Status"
@@ -257,7 +262,7 @@
                    (lambda (item)
                      (or (eq 'ok (plist-get item :type))
                          (string-match "^\\.\\." (file-relative-name (plist-get item :file) root))))
-                   audit-cache))
+                   (audit-cache)))
            (files (audit-status-calculate-files root)))
       (erase-buffer)
       (insert "Audit for directory: " root "\n"
@@ -378,7 +383,7 @@
                         (cl-remove-if-not
                          (lambda (item)
                            (string= (plist-get item :file) (buffer-file-name)))
-                         audit-cache))
+                         (audit-cache)))
                        :initial-value 0)))
                 (list
                  :percent (* 100.0 (/ (float inspected-lines) (float file-lines)))
