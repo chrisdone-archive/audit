@@ -191,14 +191,16 @@
                    (sample
                     (with-current-buffer buffer
                       (buffer-substring start end)))
-                   (comment (plist-get item :comment)))
-              (unless (eq type 'ok)
-                (insert (format "[%s](%s):%d\n\n```\n%s\n```\n\n%s\n\n-------\n"
-                                (file-relative-name file root)
-                                url
-                                line-start
-                                sample
-                                (or comment "No comment."))))))
+                   (comment (plist-get item :comment))
+                   (relative-file (file-relative-name file root)))
+              (when (string-match audit-file-pattern relative-file)
+                (unless (eq type 'ok)
+                  (insert (format "[%s](%s):%d\n\n```\n%s\n```\n\n%s\n\n-------\n"
+                                  relative-file
+                                  url
+                                  line-start
+                                  sample
+                                  comment))))))
           audit-cache)))
 
 (define-derived-mode audit-status-mode
