@@ -175,37 +175,38 @@
     (switch-to-buffer-other-window (get-buffer-create "*audit-report*"))
     (erase-buffer)
     (mapc (lambda (item)
-            (let* ((file (plist-get item :file))
-                   (start (plist-get item :start))
-                   (end (plist-get item :end))
-                   (type (plist-get item :type))
-                   (buffer (find-file-noselect file))
-                   (line-start
-                    (with-current-buffer buffer
-                      (goto-char start)
-                      (line-number-at-pos)))
-                   (line-end
-                    (with-current-buffer buffer
-                      (goto-char end)
-                      (line-number-at-pos)))
-                   (url
-                    (with-current-buffer buffer
-                      (set-mark start)
-                      (set-mark end)
-                      (github-urls-current-file-url)))
-                   (sample
-                    (with-current-buffer buffer
-                      (buffer-substring start end)))
-                   (comment (plist-get item :comment))
-                   (relative-file (file-relative-name file root)))
-              (when (string-match audit-file-pattern relative-file)
-                (unless (eq type 'ok)
-                  (insert (format "[%s](%s):%d\n\n```\n%s\n```\n\n%s\n\n-------\n"
-                                  relative-file
-                                  url
-                                  line-start
-                                  sample
-                                  comment))))))
+            (when (plist-get item :file)
+              (let* ((file (plist-get item :file))
+                     (start (plist-get item :start))
+                     (end (plist-get item :end))
+                     (type (plist-get item :type))
+                     (buffer (find-file-noselect file))
+                     (line-start
+                      (with-current-buffer buffer
+                        (goto-char start)
+                        (line-number-at-pos)))
+                     (line-end
+                      (with-current-buffer buffer
+                        (goto-char end)
+                        (line-number-at-pos)))
+                     (url
+                      (with-current-buffer buffer
+                        (set-mark start)
+                        (set-mark end)
+                        (github-urls-current-file-url)))
+                     (sample
+                      (with-current-buffer buffer
+                        (buffer-substring start end)))
+                     (comment (plist-get item :comment))
+                     (relative-file (file-relative-name file root)))
+                (when (string-match audit-file-pattern relative-file)
+                  (unless (eq type 'ok)
+                    (insert (format "[%s](%s):%d\n\n```\n%s\n```\n\n%s\n\n-------\n"
+                                    relative-file
+                                    url
+                                    line-start
+                                    sample
+                                    comment)))))))
           (audit-cache))))
 
 (define-derived-mode audit-status-mode
@@ -270,11 +271,13 @@
               (number-to-string (length items))
               "\n"
               "Progress: "
-              (format "%2.0f%%"
-                      (/ (cl-reduce '+
-                                    (mapcar (lambda (x) (plist-get x :percent)) files)
-                                    :initial-value 0.0)
-                         (length files)))
+              (if files
+                  (format "%2.0f%%"
+                          (/ (cl-reduce '+
+                                        (mapcar (lambda (x) (plist-get x :percent)) files)
+                                        :initial-value 0.0)
+                             (length files)))
+                "No files")
               "\n\n")
       (insert "Recent items:\n\n")
       (audit-status-list-items root items 3)
@@ -305,46 +308,47 @@
 (defun audit-status-list-items (root items count)
   "List N items."
   (mapc (lambda (item)
-          (let* ((file (plist-get item :file))
-                 (start (plist-get item :start))
-                 (end (plist-get item :end))
-                 (type (plist-get item :type))
-                 (buffer (find-file-noselect file))
-                 (line-start
-                  (with-current-buffer buffer
-                    (goto-char start)
-                    (line-number-at-pos)))
-                 (line-end
-                  (with-current-buffer buffer
-                    (goto-char end)
-                    (line-number-at-pos)))
-                 (sample
-                  (with-current-buffer buffer
-                    (buffer-substring start end)))
-                 (comment (plist-get item :comment)))
-            (unless (eq type 'ok)
-              (let ((button (insert-button (file-relative-name file root))))
-                (button-put button 'path (cons (file-relative-name file root) line-start))
-                (button-put button 'action
-                            (lambda (button)
-                              (let ((file-line (button-get button 'path)))
-                                (find-file-other-window (car file-line))
-                                (goto-char (point-min))
-                                (forward-line (1- (cdr file-line)))))))
-              (insert (format ":%d" line-start)
-                      "\n"
-                      (with-temp-buffer
-                        (insert (propertize
-                                 (concat (or comment "No comment.") "\n")
-                                 'audit-status-item item
-                                 'face 'audit-heading-face))
-                        (fill-paragraph)
-                        (buffer-string))
-                      (with-temp-buffer
-                        (insert sample)
-                        (delete-trailing-whitespace (point-min) (point-max))
-                        (buffer-string))
-                      "\n\n"))))
+          (when (plist-get item :file)
+            (let* ((file (plist-get item :file))
+                   (start (plist-get item :start))
+                   (end (plist-get item :end))
+                   (type (plist-get item :type))
+                   (buffer (find-file-noselect file))
+                   (line-start
+                    (with-current-buffer buffer
+                      (goto-char start)
+                      (line-number-at-pos)))
+                   (line-end
+                    (with-current-buffer buffer
+                      (goto-char end)
+                      (line-number-at-pos)))
+                   (sample
+                    (with-current-buffer buffer
+                      (buffer-substring start end)))
+                   (comment (plist-get item :comment)))
+              (unless (eq type 'ok)
+                (let ((button (insert-button (file-relative-name file root))))
+                  (button-put button 'path (cons (file-relative-name file root) line-start))
+                  (button-put button 'action
+                              (lambda (button)
+                                (let ((file-line (button-get button 'path)))
+                                  (find-file-other-window (car file-line))
+                                  (goto-char (point-min))
+                                  (forward-line (1- (cdr file-line)))))))
+                (insert (format ":%d" line-start)
+                        "\n"
+                        (with-temp-buffer
+                          (insert (propertize
+                                   (concat (or comment "No comment.") "\n")
+                                   'audit-status-item item
+                                   'face 'audit-heading-face))
+                          (fill-paragraph)
+                          (buffer-string))
+                        (with-temp-buffer
+                          (insert sample)
+                          (delete-trailing-whitespace (point-min) (point-max))
+                          (buffer-string))
+                        "\n\n")))))
         (cl-subseq
          (cl-remove-if (lambda (item) (eq 'ok (plist-get item :type))) items)
          0
