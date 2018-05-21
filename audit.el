@@ -27,7 +27,9 @@
   :group 'audit)
 
 (defface audit-ok-face
-  '((t :foreground "#7e9679"
+  '((t :foreground "#a9b290"
+       :background "#f8ffe5"
+       :strike-through t
        :weight normal
        :underline nil))
   "Face for code that is OK."
@@ -138,6 +140,7 @@
                         (1+ (line-end-position))))))
               (overlay-put o 'audit-overlay t)
               (overlay-put o 'audit-item note)
+              (overlay-put o 'priority 999999999999)
               (overlay-put o 'face
                            (cl-case (plist-get note :type)
                              (comment 'audit-comment-face)
