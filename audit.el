@@ -292,7 +292,9 @@
   "Insert the list of files."
   (mapc
    (lambda (stats)
-     (insert (format "  % 3.0f%% " (plist-get stats :percent)))
+     (insert (format "  %4.0f%% %4d / %4d " (plist-get stats :percent)
+                     (plist-get stats :inspected-lines)
+                     (plist-get stats :file-lines)))
      (let ((button (insert-button (plist-get stats :relative-file))))
        (button-put button 'path (plist-get stats :absolute-file))
        (button-put
@@ -386,7 +388,7 @@
                                     (progn
                                       (goto-char end)
                                       (line-number-at-pos))))
-                              (- line-end line-start)))
+                              (1+ (- line-end line-start))))
                           (cl-remove-if-not
                            (lambda (item)
                              (string= (plist-get item :file) (buffer-file-name)))
@@ -397,7 +399,7 @@
                    :relative-file relative-file
                    :absolute-file absolute-file
                    :file-lines file-lines
-                   :inspected-lines inspected-lines))))))))
+                   :inspected-lines (min file-lines inspected-lines)))))))))
     (directory-files-recursively root ".*"))))
 
 ;;;;;;;;;;;;;;;;;;;;;
