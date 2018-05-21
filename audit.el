@@ -306,8 +306,12 @@
      (insert "\n"))
    (sort files
          (lambda (x y)
-           (< (plist-get x :percent)
-              (plist-get y :percent))))))
+           (let ((p1 (plist-get x :percent))
+                 (p2 (plist-get y :percent)))
+             (or (< p1 p2)
+                 (when (= p1 p2)
+                   (< (plist-get x :file-lines)
+                      (plist-get y :file-lines)))))))))
 
 (defun audit-status-list-items (root items count)
   "List N items."
