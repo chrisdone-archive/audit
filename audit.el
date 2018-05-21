@@ -36,8 +36,7 @@
   :group 'audit)
 
 (defface audit-comment-face
-  '((t :background "#fffae5"
-       ))
+  '((t :background "#fffae5"))
   "Face for code that has a comment."
   :group 'audit)
 
@@ -140,7 +139,7 @@
                         (1+ (line-end-position))))))
               (overlay-put o 'audit-overlay t)
               (overlay-put o 'audit-item note)
-              (overlay-put o 'priority 999999999999)
+              (overlay-put o 'priority 999999)
               (overlay-put o 'face
                            (cl-case (plist-get note :type)
                              (comment 'audit-comment-face)
@@ -364,40 +363,41 @@
     (lambda (absolute-file)
       (let ((relative-file (file-relative-name absolute-file root)))
         (when (string-match audit-file-pattern relative-file)
-          (with-current-buffer (find-file-noselect absolute-file)
-            (save-excursion
-              (let* ((file-lines
-                      (progn
-                        (goto-char (point-max))
-                        (setq lines (line-number-at-pos))))
-                     (inspected-lines
-                      (cl-reduce
-                       '+
-                       (mapcar
-                        (lambda (item)
-                          (let* ((start (plist-get item :start))
-                                 (end (plist-get item :end))
-                                 (type (plist-get item :type))
-                                 (line-start
-                                  (progn
-                                    (goto-char start)
-                                    (line-number-at-pos)))
-                                 (line-end
-                                  (progn
-                                    (goto-char end)
-                                    (line-number-at-pos))))
-                            (- line-end line-start)))
-                        (cl-remove-if-not
-                         (lambda (item)
-                           (string= (plist-get item :file) (buffer-file-name)))
-                         (audit-cache)))
-                       :initial-value 0)))
-                (list
-                 :percent (* 100.0 (/ (float inspected-lines) (float file-lines)))
-                 :relative-file relative-file
-                 :absolute-file absolute-file
-                 :file-lines file-lines
-                 :inspected-lines inspected-lines)))))))
+          (when absolute-file
+            (with-current-buffer (find-file-noselect absolute-file)
+              (save-excursion
+                (let* ((file-lines
+                        (progn
+                          (goto-char (point-max))
+                          (setq lines (line-number-at-pos))))
+                       (inspected-lines
+                        (cl-reduce
+                         '+
+                         (mapcar
+                          (lambda (item)
+                            (let* ((start (plist-get item :start))
+                                   (end (plist-get item :end))
+                                   (type (plist-get item :type))
+                                   (line-start
+                                    (progn
+                                      (goto-char start)
+                                      (line-number-at-pos)))
+                                   (line-end
+                                    (progn
+                                      (goto-char end)
+                                      (line-number-at-pos))))
+                              (- line-end line-start)))
+                          (cl-remove-if-not
+                           (lambda (item)
+                             (string= (plist-get item :file) (buffer-file-name)))
+                           (audit-cache)))
+                         :initial-value 0)))
+                  (list
+                   :percent (* 100.0 (/ (float inspected-lines) (float file-lines)))
+                   :relative-file relative-file
+                   :absolute-file absolute-file
+                   :file-lines file-lines
+                   :inspected-lines inspected-lines))))))))
     (directory-files-recursively root ".*"))))
 
 ;;;;;;;;;;;;;;;;;;;;;
