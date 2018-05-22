@@ -194,7 +194,7 @@
                      (url
                       (with-current-buffer buffer
                         (set-mark start)
-                        (set-mark end)
+                        (goto-char end)
                         (github-urls-current-file-url)))
                      (sample
                       (with-current-buffer buffer
@@ -203,12 +203,13 @@
                      (relative-file (file-relative-name file root)))
                 (when (string-match audit-file-pattern relative-file)
                   (unless (eq type 'ok)
-                    (insert (format "[%s](%s):%d\n\n```\n%s\n```\n\n%s\n\n-------\n"
-                                    relative-file
-                                    url
+                    (insert (format "### L%d\n\n[@%s:%d](%s)\n\n%s\n\n```haskell\n%s\n```\n"
                                     line-start
-                                    sample
-                                    comment)))))))
+                                    relative-file
+                                    line-start
+                                    url
+                                    comment
+                                    sample)))))))
           (audit-cache))))
 
 (define-derived-mode audit-status-mode
@@ -274,11 +275,12 @@
               "\n"
               "Progress: "
               (if files
-                  (format "%2.0f%%"
-                          (/ (cl-reduce '+
-                                        (mapcar (lambda (x) (plist-get x :percent)) files)
-                                        :initial-value 0.0)
-                             (length files)))
+                  (format "%2.1f%%"
+                          (min 100
+                               (/ (cl-reduce '+
+                                             (mapcar (lambda (x) (plist-get x :percent)) files)
+                                             :initial-value 0.0)
+                                  (length files))))
                 "No files")
               "\n\n")
       (insert "Recent items:\n\n")
