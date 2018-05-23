@@ -222,6 +222,16 @@
 (define-key audit-status-mode-map (kbd "e") 'audit-status-edit)
 (define-key audit-status-mode-map (kbd "k") 'audit-status-ok)
 
+(define-derived-mode audit-list-mode
+  help-mode "Audit-List"
+  "Major mode for audit-list.
+ \\{audit-list-mode-map}"
+  (setq buffer-read-only t))
+
+(define-key audit-list-mode-map (kbd "g") 'audit-list)
+(define-key audit-list-mode-map (kbd "e") 'audit-list-edit)
+(define-key audit-list-mode-map (kbd "k") 'audit-list-ok)
+
 (defun audit-status-edit ()
   (interactive)
   (let ((item (get-text-property (point) 'audit-status-item)))
@@ -239,6 +249,23 @@
     (audit-save)
     (audit-status)))
 
+(defun audit-list-edit ()
+  (interactive)
+  (let ((item (get-text-property (point) 'audit-status-item)))
+    (setq audit-cache
+          (mapcar (lambda (this)
+                    (when (equal this item)
+                      (plist-put
+                       this
+                       :comment
+                       (read-from-minibuffer
+                        "Comment: "
+                        (plist-get this :comment))))
+                    this)
+                  audit-cache))
+    (audit-save)
+    (audit-list)))
+
 (defun audit-status-ok ()
   (interactive)
   (let ((item (get-text-property (point) 'audit-status-item)))
@@ -251,6 +278,19 @@
                   audit-cache))
     (audit-save)
     (audit-status)))
+
+(defun audit-list-ok ()
+  (interactive)
+  (let ((item (get-text-property (point) 'audit-status-item)))
+    (setq audit-cache
+          (mapcar (lambda (this)
+                    (when (equal this item)
+                      (plist-put this :type 'ok)
+                      (plist-put this :comment nil))
+                    this)
+                  audit-cache))
+    (audit-save)
+    (audit-list)))
 
 (defun audit-status ()
   "Display a status buffer of all non-OK review comments."
@@ -288,6 +328,33 @@
       (insert "Files:\n\n")
       (audit-status-list-files files)
       (goto-char (point-min)))
+    (message "Audit refreshed.")))
+
+(defun audit-list ()
+  "Display all non-OK review comments."
+  (interactive)
+  (let ((root default-directory))
+    (unless (string= (buffer-name)
+                     "*audit-list*")
+      (switch-to-buffer-other-window (get-buffer-create "*audit-list*")))
+    (setq default-directory root)
+    (audit-list-mode)
+    (let* ((inhibit-read-only t)
+           (items (cl-remove-if
+                   (lambda (item)
+                     (or (eq 'ok (plist-get item :type))
+                         (string-match "^\\.\\." (file-relative-name (plist-get item :file) root))))
+                   (audit-cache)))
+           (files (audit-status-calculate-files root)))
+      (let ((line (line-number-at-pos)))
+        (erase-buffer)
+        (insert "Audit for directory: " root "\n"
+                "Comments: "
+                (number-to-string (length items))
+                "\n\n")
+        (audit-status-list-items root items (length items))
+        (goto-char (point-min))
+        (forward-line (1- line))))
     (message "Audit refreshed.")))
 
 (defun audit-status-list-files (files)
@@ -357,7 +424,7 @@
                         (with-temp-buffer
                           (insert sample)
                           (delete-trailing-whitespace (point-min) (point-max))
-                          (buffer-string))
+                          (buffer-substring (point-min) (min (point-max) 128)))
                         "\n\n")))))
         (cl-subseq
          (cl-remove-if (lambda (item) (eq 'ok (plist-get item :type))) items)
