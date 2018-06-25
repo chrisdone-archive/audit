@@ -426,10 +426,11 @@
                           (delete-trailing-whitespace (point-min) (point-max))
                           (buffer-substring (point-min) (min (point-max) 128)))
                         "\n\n")))))
-        (cl-subseq
-         (cl-remove-if (lambda (item) (eq 'ok (plist-get item :type))) items)
-         0
-         count)))
+        (let ((list (cl-remove-if (lambda (item) (eq 'ok (plist-get item :type))) items)))
+          (cl-subseq
+           list
+           0
+           (min (length list) count)))))
 
 (defun audit-status-calculate-files (root)
   (cl-remove-if-not
