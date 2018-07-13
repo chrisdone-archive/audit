@@ -173,44 +173,108 @@
 (defun audit-export-markdown ()
   "Export to markdown."
   (interactive)
-  (let ((root default-directory))
+  (let ((root default-directory)
+        (pkg (read-from-minibuffer "Package: "))
+        (ver (read-from-minibuffer "Version: ")))
     (switch-to-buffer-other-window (get-buffer-create "*audit-report*"))
     (erase-buffer)
-    (mapc (lambda (item)
-            (when (plist-get item :file)
-              (let* ((file (plist-get item :file))
-                     (start (plist-get item :start))
-                     (end (plist-get item :end))
-                     (type (plist-get item :type))
-                     (buffer (find-file-noselect file))
-                     (line-start
-                      (with-current-buffer buffer
-                        (goto-char start)
-                        (line-number-at-pos)))
-                     (line-end
-                      (with-current-buffer buffer
-                        (goto-char end)
-                        (line-number-at-pos)))
-                     (url
-                      (with-current-buffer buffer
-                        (set-mark start)
-                        (goto-char end)
-                        (github-urls-current-file-url)))
-                     (sample
-                      (with-current-buffer buffer
-                        (buffer-substring start end)))
-                     (comment (plist-get item :comment))
-                     (relative-file (file-relative-name file root)))
-                (when (string-match audit-file-pattern relative-file)
-                  (unless (eq type 'ok)
-                    (insert (format "### L%d\n\n[@%s:%d](%s)\n\n%s\n\n```haskell\n%s\n```\n"
-                                    line-start
-                                    relative-file
-                                    line-start
-                                    url
-                                    comment
-                                    sample)))))))
-          (audit-cache))))
+    (let* ((inhibit-read-only t)
+           (items (cl-remove-if
+                   (lambda (item)
+                     (or (eq 'ok (plist-get item :type))
+                         (string-match "^\\.\\." (file-relative-name (plist-get item :file) root))))
+                   (audit-cache)))
+           (files (audit-status-calculate-files root)))
+      (erase-buffer)
+      (insert "# Audit\n\n"
+              "Package: " pkg "\n\n"
+              "Version: " ver "\n\n"
+              "SHA256: " (replace-regexp-in-string
+                          "[ ]+-" ""
+                          (shell-command-to-string "find . -type f | xargs sha256sum | sha256sum")) "\n"
+              "Date-Completed: " (format-time-string "%Y-%m-%d") "\n\n"
+              "Comments: " (number-to-string (length items)) "\n\n"
+      )
+      (insert (format "## Verify this audit
+
+Verify the document:
+
+    $ git clone https://github.com/chrisdone/audits
+    $ cd audits
+    $ keybase pgp verify -i haskell/%s/%s.md -d haskell/%s/%s.sig
+
+Verify the SHA256 of the package contents:
+
+    $ stack unpack %s-%s
+    $ cd %s-%s
+    $ find . -type f | xargs sha256sum | sha256sum
+"
+              pkg ver pkg ver pkg ver pkg ver))
+      (insert "\n##Summary\n\n")
+      (insert "## Files\n\n")
+      (audit-status-list-files files)
+      (insert "\n## Comments\n\n"))
+    (let ((comments nil))
+      (mapc (lambda (item)
+              (let ((absolute-file (plist-get item :file)))
+                (let ((relative-file (file-relative-name absolute-file root)))
+                  (when (and (not (string-match "^\\.\\.[\\/]" relative-file))
+                             (string-match audit-file-pattern relative-file))
+                    (when absolute-file
+                      (let* ((file (plist-get item :file))
+                             (start (plist-get item :start))
+                             (end (plist-get item :end))
+                             (type (plist-get item :type))
+                             (buffer (find-file-noselect file))
+                             (line-start
+                              (with-current-buffer buffer
+                                (goto-char start)
+                                (line-number-at-pos)))
+                             (line-end
+                              (with-current-buffer buffer
+                                (goto-char end)
+                                (line-number-at-pos)))
+                             ;; (url
+                             ;;  (with-current-buffer buffer
+                             ;;    (set-mark start)
+                             ;;    (goto-char end)
+                             ;;    (github-urls-current-file-url)))
+                             (sample
+                              (with-current-buffer buffer
+                                (buffer-substring start end)))
+                             (comment (plist-get item :comment))
+                             (relative-file (file-relative-name file root)))
+                        (when (string-match audit-file-pattern relative-file)
+                          (unless (eq type 'ok)
+                            (setq comments t)
+                            (insert (format "### L%d\n\n@%s:%d\n\n%s\n\n```haskell\n%s\n```\n"
+                                            line-start
+                                            relative-file
+                                            line-start
+                                            ;; url
+                                            comment
+                                            sample))))))))))
+            (audit-cache))
+      (unless comments
+        (insert "No comments.")))))
+
+(defun audit-sha256-files (files)
+  "Get the SHA256 of all the files and then SHA256 that."
+  (with-temp-buffer
+    (cl-case (apply #'call-process
+                    "sha256sum"
+                    nil
+                    (list (current-buffer) nil)
+                    (mapcar (lambda (p) (plist-get p :relative-file)) files))
+      (0 (goto-char (point-min))
+         (shell-command-on-region
+          (point-min)
+          (point-max)
+          "sha256sum"
+          nil
+          t)
+         (replace-regexp-in-string "[ ]*-" "" (buffer-string)))
+      (1 nil))))
 
 (define-derived-mode audit-status-mode
   help-mode "Audit-Status"
@@ -361,7 +425,7 @@
   "Insert the list of files."
   (mapc
    (lambda (stats)
-     (insert (format "  %4.0f%% %4d / %4d " (plist-get stats :percent)
+     (insert (format "   %4.0f%% %4d / %4d " (plist-get stats :percent)
                      (plist-get stats :inspected-lines)
                      (plist-get stats :file-lines)))
      (let ((button (insert-button (plist-get stats :relative-file))))
