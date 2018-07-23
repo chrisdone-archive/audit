@@ -425,7 +425,8 @@ Verify the SHA256 of the package contents:
   "Insert the list of files."
   (mapc
    (lambda (stats)
-     (insert (format "   %4.0f%% %4d / %4d " (plist-get stats :percent)
+     (insert (format "   %4.0f%% %4d / %4d "
+                     (min 100 (plist-get stats :percent))
                      (plist-get stats :inspected-lines)
                      (plist-get stats :file-lines)))
      (let ((button (insert-button (plist-get stats :relative-file))))
